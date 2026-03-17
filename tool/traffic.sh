@@ -1,7 +1,24 @@
 #!/usr/bin/env bash
 
-_APISERVER=127.0.0.1:32768
-_XRAY=/usr/local/bin/xray
+# 注释: 通过 Qwen3-Coder 生成。
+# 脚本名称: traffic.sh
+# 脚本仓库: https://github.com/zxcvos/Xray-script
+# 作者: zxcvos, LinFly, GitHub Copilot
+# 依赖: bash
+
+readonly CUR_DIR="$(cd -P -- "$(dirname -- "$0")" && pwd -P)" # 当前脚本所在目录
+readonly PROJECT_ROOT="$(cd -P -- "${CUR_DIR}/.." && pwd -P)" # 项目根目录
+readonly _XRAY="${PROJECT_ROOT}/.xray-script/bin/xray"
+readonly _APISERVER=127.0.0.1:32768
+
+function print_error() {
+    echo "[ERROR] $*" >&2
+    exit 1
+}
+
+if [[ ! -x "${_XRAY}" ]]; then
+    print_error "Xray binary not found in project path: ${_XRAY}"
+fi
 
 apidata() {
     local ARGS=

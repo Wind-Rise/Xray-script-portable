@@ -487,7 +487,14 @@
     },
     "service": {
       "configure": "Configuring Nginx systemd service.",
-      "complete": "Nginx systemd service configuration completed."
+      "complete": "Nginx systemd service configuration completed.",
+      "skip": "Skipping systemd service creation because --service was not provided.",
+      "no_systemctl": "systemctl not available; skipping service reload."
+    },
+    "purge": {
+      "start_purge": "Uninstalling Nginx...",
+      "no_service": "No systemd service file found; skipping service cleanup.",
+      "purged": "Nginx has been uninstalled."
     },
     "os": {
       "unsupported_os": "Unsupported operating system.",
@@ -507,6 +514,7 @@
       "opt_install": "Install Nginx",
       "opt_update": "Update Nginx",
       "opt_brotli": "Enable Brotli compression (use with --install or --update)",
+      "opt_service": "Configure systemd service for Nginx (optional)",
       "opt_purge": "Uninstall Nginx",
       "opt_help": "Show this help message"
     }

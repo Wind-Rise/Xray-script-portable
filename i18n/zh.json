@@ -487,7 +487,14 @@
     },
     "service": {
       "configure": "配置 Nginx systemd 服务。",
-      "complete": "Nginx systemd 服务配置完成。"
+      "complete": "Nginx systemd 服务配置完成。",
+      "skip": "未提供 --service，已跳过 systemd 服务创建。",
+      "no_systemctl": "未检测到 systemctl，已跳过服务重载。"
+    },
+    "purge": {
+      "start_purge": "正在卸载 Nginx...",
+      "no_service": "未找到 systemd 服务文件，已跳过服务清理。",
+      "purged": "Nginx 已卸载。"
     },
     "os": {
       "unsupported_os": "不支持的操作系统。",
@@ -507,6 +514,7 @@
       "opt_install": "安装 Nginx",
       "opt_update": "更新 Nginx",
       "opt_brotli": "启用 Brotli 压缩 (与 --install 或 --update 一起使用)",
+      "opt_service": "为 Nginx 配置 systemd 服务（可选）",
       "opt_purge": "卸载 Nginx",
       "opt_help": "显示帮助信息"
     }

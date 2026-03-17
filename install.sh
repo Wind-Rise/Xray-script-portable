@@ -6,7 +6,7 @@
 # 功能描述: Xray-script 项目的安装引导脚本。
 #           负责检查和安装系统依赖、下载项目文件、处理命令行参数、
 #           初始化配置、设置语言以及启动主菜单。
-# 作者: zxcvos
+# 作者: zxcvos (原作者), LinFly (二次开发), GitHub Copilot (AI 协助)
 # 时间: 2025-07-25
 # 版本: 1.0.0
 # 依赖: bash, curl, wget, git, jq, sed, awk, grep
@@ -42,9 +42,11 @@ readonly NC='\033[0m'      # 无颜色（重置）
 readonly CUR_DIR="$(cd -P -- "$(dirname -- "$0")" && pwd -P)" # 当前脚本所在目录
 readonly CUR_FILE="$(basename "$0")"                          # 当前脚本文件名
 
+declare PROJECT_ROOT=''                # 项目根目录，将在 main() 中确定
+declare PROJECT_ROOT_OVERRIDE=''       # 自定义项目根目录
 # 定义配置文件和相关目录的路径
-readonly SCRIPT_CONFIG_DIR="${HOME}/.xray-script"              # 主配置文件目录
-readonly SCRIPT_CONFIG_PATH="${SCRIPT_CONFIG_DIR}/config.json" # 脚本主配置文件路径
+declare SCRIPT_CONFIG_DIR=''           # 主配置文件目录，将在 main() 中根据 PROJECT_ROOT 确定
+declare SCRIPT_CONFIG_PATH=''          # 脚本主配置文件路径
 
 # --- 全局变量声明 ---
 # 声明用于存储国际化数据、项目根目录和快速安装选项的全局变量
@@ -488,6 +490,19 @@ function check_xray_script_version() {
 function main() {
     # 解析命令行参数
     parse_args "$@"
+
+    # 初始化项目根目录和配置路径
+    PROJECT_ROOT="${CUR_DIR}"
+    SCRIPT_CONFIG_DIR="${PROJECT_ROOT}/.xray-script"
+    SCRIPT_CONFIG_PATH="${SCRIPT_CONFIG_DIR}/config.json"
+
+    if [[ ! -d "${SCRIPT_CONFIG_DIR}" ]]; then
+        mkdir -p "${SCRIPT_CONFIG_DIR}"
+    fi
+    if [[ ! -f "${SCRIPT_CONFIG_PATH}" ]]; then
+        wget -O "${SCRIPT_CONFIG_PATH}" https://raw.githubusercontent.com/zxcvos/Xray-script/main/config.json
+    fi
+
     # 加载国际化数据
     load_i18n
 
@@ -533,7 +548,7 @@ function main() {
         # 自定义安装目录选项
         -d)
             shift
-            PROJECT_ROOT="${1}"
+            PROJECT_ROOT_OVERRIDE="${1}"
             ;;
         esac
         shift
@@ -541,9 +556,9 @@ function main() {
 
     # 从脚本配置文件中读取已记录的安装路径
     local script_path="$(jq -r '.path' "${SCRIPT_CONFIG_PATH}")"
-    # 如果配置文件中没有记录路径，且命令行也未指定，则使用默认路径
-    if [[ -z "${script_path}" && -z "${PROJECT_ROOT}" ]]; then
-        PROJECT_ROOT='/usr/local/xray-script' # 设置默认项目根目录
+    # 如果配置文件中没有记录路径，且命令行也未指定，则使用当前脚本所在目录作为默认项目根目录
+    if [[ -z "${script_path}" && -z "${PROJECT_ROOT_OVERRIDE}" ]]; then
+        PROJECT_ROOT="${CUR_DIR}" # 设置默认项目根目录
         # 将默认路径更新到脚本配置文件中
         SCRIPT_CONFIG="$(jq --arg path "${PROJECT_ROOT}" '.path = $path' "${SCRIPT_CONFIG_PATH}")"
         echo "${SCRIPT_CONFIG}" >"${SCRIPT_CONFIG_PATH}" && sleep 2
@@ -551,7 +566,8 @@ function main() {
     elif [[ -n "${script_path}" ]]; then
         PROJECT_ROOT="${script_path}"
     # 如果配置文件中没有路径，但命令行指定了路径，则使用命令行指定的路径并更新配置文件
-    elif [[ -n "${PROJECT_ROOT}" ]]; then
+    elif [[ -n "${PROJECT_ROOT_OVERRIDE}" ]]; then
+        PROJECT_ROOT="${PROJECT_ROOT_OVERRIDE}"
         # 将命令行指定的路径更新到脚本配置文件中
         SCRIPT_CONFIG="$(jq --arg path "${PROJECT_ROOT}" '.path = $path' "${SCRIPT_CONFIG_PATH}")"
         echo "${SCRIPT_CONFIG}" >"${SCRIPT_CONFIG_PATH}" && sleep 2

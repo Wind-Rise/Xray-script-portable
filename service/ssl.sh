@@ -6,12 +6,12 @@
 # 功能描述: 使用 acme.sh 管理 SSL 证书的脚本。
 #           支持安装/更新/卸载 acme.sh，签发/续期/停止续期证书，
 #           检查证书状态和信息，以及管理 Nginx 配置。
-# 作者: zxcvos
+# 作者: zxcvos, LinFly, GitHub Copilot
 # 时间: 2025-07-25
 # 版本: 1.0.0
 # 依赖: bash, curl, wget, git, jq, sed, awk, grep, nginx, systemctl, acme.sh
 # 配置:
-#   - ${HOME}/.acme.sh/: acme.sh 的默认安装和数据目录
+#   - ${SCRIPT_CONFIG_DIR}/acme.sh/: acme.sh 的默认安装和数据目录
 #   - ${NGINX_CONFIG_PATH}/: Nginx 配置文件目录
 #   - ${ACME_WEBROOT_PATH}/: 用于 HTTP-01 挑战的临时 webroot 目录
 #   - ${SSL_CERT_PATH}/: 存放签发证书的目录
@@ -42,14 +42,16 @@ readonly CUR_FILE="$(basename "$0" | sed 's/\..*//')"         # 当前脚本文�
 readonly PROJECT_ROOT="$(cd -P -- "${CUR_DIR}/.." && pwd -P)" # 项目根目录
 
 # 定义项目中各个重要目录与配置文件的路径
-readonly SCRIPT_CONFIG_DIR="${HOME}/.xray-script"              # 主配置文件目录
+readonly SCRIPT_CONFIG_DIR="${PROJECT_ROOT}/.xray-script"      # 主配置文件目录
 readonly I18N_DIR="${PROJECT_ROOT}/i18n"                       # 国际化文件目录
 readonly SCRIPT_CONFIG_PATH="${SCRIPT_CONFIG_DIR}/config.json" # 脚本主要配置文件路径
+readonly ACME_DIR="${SCRIPT_CONFIG_DIR}/acme.sh"                # ACME.sh 数据目录
+readonly ACME_PATH="${ACME_DIR}/acme.sh"                        # ACME.sh 脚本路径
 
 # 定义 Nginx 配置、ACME 验证、 SSL 证书的路径
-readonly NGINX_CONFIG_PATH='/usr/local/nginx/conf'  # Nginx 配置目录
-readonly ACME_WEBROOT_PATH='/var/www/_zerossl'      # ACME HTTP 验证 webroot 目录
-readonly SSL_CERT_PATH="${NGINX_CONFIG_PATH}/certs" # SSL 证书存储目录
+readonly NGINX_CONFIG_PATH="${PROJECT_ROOT}/nginx/conf"  # Nginx 配置目录
+readonly ACME_WEBROOT_PATH="${SCRIPT_CONFIG_DIR}/acme-webroot"      # ACME HTTP 验证 webroot 目录
+readonly SSL_CERT_PATH="${SCRIPT_CONFIG_DIR}/certs" # SSL 证书存储目录
 
 # --- 全局变量声明 ---
 # 声明用于存储脚本操作、域名、邮箱、存储语言参数和国际化数据的全局变量
@@ -188,8 +190,8 @@ function resolve_ca_server() {
 # =============================================================================
 function set_default_ca() {
     resolve_ca_server
-    [[ -x "${HOME}/.acme.sh/acme.sh" ]] || print_error "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.set_ca.not_installed")"
-    "${HOME}/.acme.sh/acme.sh" --set-default-ca --server "${CA_SERVER}" || print_error "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.install.fail_set_ca")"
+    [[ -x "${ACME_PATH}" ]] || print_error "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.set_ca.not_installed")"
+    "${ACME_PATH}" --set-default-ca --server "${CA_SERVER}" || print_error "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.install.fail_set_ca")"
 }
 
 # =============================================================================
@@ -200,7 +202,7 @@ function set_default_ca() {
 # =============================================================================
 function install_acme_sh() {
     # 检查 acme.sh 是否已经安装
-    if [[ -e "${HOME}/.acme.sh/acme.sh" ]]; then
+    if [[ -e "${ACME_PATH}" ]]; then
         print_info "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.install.already_installed")"
         return 0
     fi
@@ -209,13 +211,14 @@ function install_acme_sh() {
     print_info "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.install.start")"
     resolve_ca_server
 
-    # 使用 curl 下载并运行 acme.sh 安装脚本，设置账户邮箱
-    curl https://get.acme.sh | sh -s email="${ACCOUNT_EMAIL}" || print_error "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.install.fail_download")"
+    # 使用 curl 下载并运行 acme.sh 安装脚本，设置账户邮箱并指定项目目录
+    mkdir -p "${ACME_HOME}"
+    HOME="${ACME_HOME}" curl https://get.acme.sh | sh -s email="${ACCOUNT_EMAIL}" || print_error "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.install.fail_download")"
 
     # 启用 acme.sh 的自动升级功能
-    "${HOME}/.acme.sh/acme.sh" --upgrade --auto-upgrade || print_error "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.install.fail_autoupgrade")"
+    "${ACME_PATH}" --upgrade --auto-upgrade || print_error "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.install.fail_autoupgrade")"
 
-    "${HOME}/.acme.sh/acme.sh" --set-default-ca --server "${CA_SERVER}" || print_error "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.install.fail_set_ca")"
+    "${ACME_PATH}" --set-default-ca --server "${CA_SERVER}" || print_error "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.install.fail_set_ca")"
 }
 
 # =============================================================================
@@ -229,7 +232,7 @@ function update_acme_sh() {
     print_info "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.update.start")"
 
     # 执行 acme.sh 的升级命令
-    "${HOME}/.acme.sh/acme.sh" --upgrade || print_error "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.update.fail")"
+    "${ACME_PATH}" --upgrade || print_error "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.update.fail")"
 }
 
 # =============================================================================
@@ -243,15 +246,15 @@ function purge_acme_sh() {
     print_info "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.purge.start")"
 
     # 检查 acme.sh 是否存在
-    if [[ -e "${HOME}/.acme.sh/acme.sh" ]]; then
+    if [[ -e "${ACME_PATH}" ]]; then
         # 禁用 acme.sh 的自动升级
-        "${HOME}/.acme.sh/acme.sh" --upgrade --auto-upgrade 0 || print_warn "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.purge.fail_disable_autoupgrade")"
+        "${ACME_PATH}" --upgrade --auto-upgrade 0 || print_warn "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.purge.fail_disable_autoupgrade")"
         # 执行 acme.sh 的卸载命令
-        "${HOME}/.acme.sh/acme.sh" --uninstall || print_warn "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.purge.fail_uninstall_cmd")"
+        "${ACME_PATH}" --uninstall || print_warn "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.purge.fail_uninstall_cmd")"
     fi
 
     # 删除 acme.sh 相关目录和文件
-    rm -rf "${HOME}/.acme.sh" "${ACME_WEBROOT_PATH}" "${NGINX_CONFIG_PATH}/certs"
+    rm -rf "${ACME_HOME}" "${ACME_WEBROOT_PATH}" "${NGINX_CONFIG_PATH}/certs"
     # 打印删除成功信息
     print_info "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.purge.success")"
 }
@@ -292,7 +295,7 @@ function issue_certificate() {
     # 生成一个临时的 Nginx 配置文件，用于 ACME HTTP-01 验证
     cat >"${nginx_conf}" <<EOF
 user                 root;
-pid                  /run/nginx.pid;
+pid                  ${PROJECT_ROOT}/nginx/run/nginx.pid;
 worker_processes     1;
 events {
     worker_connections  1024;
@@ -311,13 +314,14 @@ http {
 }
 EOF
 
+    local nginx_bin="${PROJECT_ROOT}/nginx/bin/nginx"
     # 检查 Nginx 是否正在运行
     if systemctl is-active --quiet nginx; then
         # 如果运行，则测试配置并重载
-        nginx -t && systemctl reload nginx || print_error "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.issue.fail_reload_nginx")"
+        "${nginx_bin}" -t && systemctl reload nginx || print_error "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.issue.fail_reload_nginx")"
     else
         # 如果未运行，则测试配置并启动
-        nginx -t && systemctl start nginx || print_error "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.issue.fail_start_nginx")"
+        "${nginx_bin}" -t && systemctl start nginx || print_error "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.issue.fail_start_nginx")"
     fi
 
     local issue_output=''
@@ -343,7 +347,7 @@ EOF
         for issue_retry in 1 2 3; do
             issue_retry_message="$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.issue.letsencrypt_retry" | sed "s|\${attempt}|${issue_retry}|g")"
             print_warn "${issue_retry_message}"
-            issue_output="$("${HOME}/.acme.sh/acme.sh" "${issue_args[@]}" 2>&1)"
+            issue_output="$("${ACME_PATH}" "${issue_args[@]}" 2>&1)"
             issue_status=$?
             [[ -n "${issue_output}" ]] && printf "%s\n" "${issue_output}" >&2
             [[ ${issue_status} -eq 0 ]] && break
@@ -353,7 +357,7 @@ EOF
             print_error "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.issue.letsencrypt_fail")"
         fi
     else
-        issue_output="$("${HOME}/.acme.sh/acme.sh" "${issue_args[@]}" 2>&1)"
+        issue_output="$("${ACME_PATH}" "${issue_args[@]}" 2>&1)"
         issue_status=$?
         [[ -n "${issue_output}" ]] && printf "%s\n" "${issue_output}" >&2
         if [[ ${issue_status} -ne 0 ]]; then
@@ -374,7 +378,7 @@ EOF
                 for issue_retry in 1 2 3; do
                     issue_retry_message="$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.issue.letsencrypt_retry" | sed "s|\${attempt}|${issue_retry}|g")"
                     print_warn "${issue_retry_message}"
-                    issue_output="$("${HOME}/.acme.sh/acme.sh" "${issue_args[@]}" 2>&1)"
+                    issue_output="$("${ACME_PATH}" "${issue_args[@]}" 2>&1)"
                     issue_status=$?
                     [[ -n "${issue_output}" ]] && printf "%s\n" "${issue_output}" >&2
                     [[ ${issue_status} -eq 0 ]] && break
@@ -386,7 +390,7 @@ EOF
             else
                 print_warn "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.issue.fail_first_attempt")"
                 local -a debug_issue_args=("${issue_args[@]}" --debug)
-                "${HOME}/.acme.sh/acme.sh" "${debug_issue_args[@]}"
+                "${ACME_PATH}" "${debug_issue_args[@]}"
                 mv -f "${nginx_conf_bak}" "${nginx_conf}"
                 print_error "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.issue.fail_ecc_issue")"
             fi
@@ -397,10 +401,10 @@ EOF
     mv -f "${nginx_conf_bak}" "${nginx_conf}"
 
     # 安装签发的证书到指定路径，并设置 Nginx 重载命令
-    "${HOME}/.acme.sh/acme.sh" --install-cert --ecc -d ${DOMAIN} \
+    "${ACME_PATH}" --install-cert --ecc -d ${DOMAIN} \
         --key-file "${cert_path}/privkey.pem" \
         --fullchain-file "${cert_path}/fullchain.pem" \
-        --reloadcmd "nginx -t && systemctl reload nginx" || print_error "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.issue.fail_install_cert")"
+        --reloadcmd "${PROJECT_ROOT}/nginx/bin/nginx -t && systemctl reload nginx" || print_error "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.issue.fail_install_cert")"
 }
 
 # =============================================================================
@@ -414,7 +418,7 @@ function renew_certificates() {
     print_info "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.renew.start")"
 
     # 执行 acme.sh 的强制续期命令
-    "${HOME}/.acme.sh/acme.sh" --cron --force || print_error "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.renew.fail")"
+    "${ACME_PATH}" --cron --force || print_error "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.renew.fail")"
 }
 
 # =============================================================================
@@ -430,9 +434,9 @@ function stop_renew_certificates() {
     # 检查是否提供了域名
     if [[ ${#DOMAIN} -gt 0 ]]; then
         # 执行 acme.sh 的移除命令（停止续期）
-        "${HOME}/.acme.sh/acme.sh" --remove -d ${DOMAIN} --ecc || print_warn "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.stop_renew.fail_cmd")"
+        "${ACME_PATH}" --remove -d ${DOMAIN} --ecc || print_warn "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.stop_renew.fail_cmd")"
         # 删除该域名的 acme.sh 本地存储目录
-        rm -rf "${HOME}/.acme.sh/${DOMAIN}_ecc" # 更健壮的路径处理
+        rm -rf "${ACME_HOME}/${DOMAIN}_ecc" # 更健壮的路径处理
         # 删除该域名的本地证书目录
         rm -rf "${NGINX_CONFIG_PATH}/certs/${DOMAIN}" # 更健壮的路径处理
     else
@@ -452,7 +456,7 @@ function check_cron_jobs() {
     print_info "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.check_cron.start")"
 
     # 执行 acme.sh 的 cron 检查命令
-    "${HOME}/.acme.sh/acme.sh" --cron --home "${HOME}/.acme.sh"
+    "${ACME_PATH}" --cron --home "${ACME_HOME}"
 }
 
 # =============================================================================
@@ -469,7 +473,7 @@ function check_certificate_status() {
 
     # 从 acme.sh 列表中查找匹配的域名
     local main_domain=$(
-        "${HOME}/.acme.sh/acme.sh" --list --home "${HOME}/.acme.sh" |
+        "${ACME_PATH}" --list --home "${ACME_HOME}" |
             grep -E "^${DOMAIN}" |
             awk '{print $1}'
     )
@@ -494,7 +498,7 @@ function show_certificate_info() {
     print_info "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.info.start")"
 
     # 执行 acme.sh 的信息显示命令
-    "${HOME}/.acme.sh/acme.sh" --info -d ${DOMAIN}
+    "${ACME_PATH}" --info -d ${DOMAIN}
 }
 
 # =============================================================================
