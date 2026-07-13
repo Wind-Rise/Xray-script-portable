@@ -36,6 +36,8 @@ readonly PROJECT_ROOT="$(cd -P -- "${CUR_DIR}/.." && pwd -P)" # 项目根目录
 readonly SCRIPT_CONFIG_DIR="${PROJECT_ROOT}/.xray-script"      # 配置文件目录
 readonly SCRIPT_CONFIG_PATH="${SCRIPT_CONFIG_DIR}/config.json" # 脚本主要配置文件路径
 
+mkdir -p "${SCRIPT_CONFIG_DIR}" >/dev/null 2>&1 || true
+
 # =============================================================================
 # 函数名称: generate_random
 # 功能描述: 生成一个随机数。如果不提供参数或参数无效，则生成一个无符号32位随机整数；

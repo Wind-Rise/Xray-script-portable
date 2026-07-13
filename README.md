@@ -1,8 +1,9 @@
 中文 | [English](/.github/README.en.md)
 
-# Xray 管理脚本 :sparkles:
+# Xray-script-portable :sparkles:
 
-* 一个纯 Shell 编写的 Xray 管理脚本
+* 一个可移植的 Shell 脚本套件，默认把 Xray、Nginx、证书和运行时配置都保存在项目根目录内。
+* 适合把整个项目拷贝到任意目录或容器中运行，避免依赖外部家目录、系统级固定路径或额外的安装目录。
 * 可选配置:
   * mKCP (VLESS-mKCP-seed)
   * Vision (VLESS-Vision-REALITY)

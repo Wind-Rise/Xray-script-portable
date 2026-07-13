@@ -67,6 +67,26 @@ readonly SCRIPT_CONFIG_PATH="${SCRIPT_CONFIG_DIR}/config.json" # 脚本主配置
 readonly ACME_DIR="${SCRIPT_CONFIG_DIR}/acme.sh"                # ACME.sh 数据目录
 readonly ACME_PATH="${ACME_DIR}/acme.sh"                  # ACME.sh 脚本路径
 
+# 确保项目内运行时目录存在，避免后续写入 Xray / Nginx / SSL 配置失败
+if ! mkdir -p \
+    "${SCRIPT_CONFIG_DIR}" \
+    "${SCRIPT_CONFIG_DIR}/xray" \
+    "${SCRIPT_CONFIG_DIR}/acme.sh" \
+    "${NGINX_CONFIG_DIR}" \
+    "${NGINX_CONFIG_DIR}/sites-available" \
+    "${NGINX_CONFIG_DIR}/sites-enabled" \
+    "${NGINX_CONFIG_DIR}/modules-enabled" \
+    "${NGINX_CONFIG_DIR}/conf.d" \
+    "${NGINX_CONFIG_DIR}/web" \
+    "${NGINX_CONFIG_DIR}/nginxconfig.io"; then
+    echo -e "${RED}[错误]${NC} 无法创建项目运行时目录" >&2
+    exit 1
+fi
+
+if [[ ! -f "${SCRIPT_CONFIG_PATH}" ]]; then
+    echo '{}' >"${SCRIPT_CONFIG_PATH}"
+fi
+
 # --- 全局变量声明 ---
 # 声明用于存储配置数据和国际化数据的全局变量
 declare SCRIPT_CONFIG="$(jq '.' "${SCRIPT_CONFIG_PATH}")" # 存储从 config.json 读取的脚本配置
@@ -290,13 +310,16 @@ function exec_read() {
             [[ -z "${result}" ]] && exec_check '--short' "${result}" && break
             # 将逗号分隔的输入分割成数组
             IFS=',' read -r -a values <<<"${result}"
+            local normalized_values=''
             # 遍历每个 Short ID 进行验证
             for value in "${values[@]}"; do
+                value="${value//[[:space:]]/}"
                 if exec_check '--short' "${value}"; then
                     # 验证通过则追加到 CONFIG_DATA['short_ids']
-                    CONFIG_DATA['short_ids']="${CONFIG_DATA['short_ids']} ${value}"
+                    normalized_values+=" ${value}"
                 fi
             done
+            CONFIG_DATA['short_ids']="${normalized_values}"
             ;;
         path)
             # 验证路径
@@ -851,7 +874,8 @@ function handler_script_config() {
     # 获取 CDN 域名
     local CDN_DOMAIN="${CONFIG_DATA['cdn']}"
     # 获取或生成 Short IDs
-    local SHORT_IDS="$(exec_generate '--short-ids' ${CONFIG_DATA['short_ids']:-'8 8'})"
+    local short_ids_input="${CONFIG_DATA['short_ids']:-'8 8'}"
+    local SHORT_IDS="$(exec_generate '--short-ids' ${short_ids_input})"
     # 获取 CA 邮箱
     local CA_EMAIL="${CONFIG_DATA['email']}"
     # 更新脚本配置中的规则状态

@@ -499,6 +499,7 @@ function main() {
     if [[ ! -d "${SCRIPT_CONFIG_DIR}" ]]; then
         mkdir -p "${SCRIPT_CONFIG_DIR}"
     fi
+    mkdir -p "${SCRIPT_CONFIG_DIR}/xray" "${SCRIPT_CONFIG_DIR}/acme.sh" >/dev/null 2>&1 || true
     if [[ ! -f "${SCRIPT_CONFIG_PATH}" ]]; then
         wget -O "${SCRIPT_CONFIG_PATH}" https://raw.githubusercontent.com/zxcvos/Xray-script/main/config.json
     fi

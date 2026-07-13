@@ -1,9 +1,10 @@
 <!-- Translated by AI -->
 [中文](/README.md) | English
 
-# Xray Management Script :sparkles:
+# Xray-script-portable :sparkles:
 
-* A pure Shell-based Xray management script
+* A portable Shell-based Xray management suite that keeps Xray, Nginx, certificates, and runtime data under the project root by default.
+* Suitable for copying the project into any directory or container and running it without depending on external home or system-level paths.
 * Optional configurations:
   * mKCP (VLESS-mKCP-seed)
   * Vision (VLESS-Vision-REALITY)
