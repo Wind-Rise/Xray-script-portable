@@ -1,19 +1,17 @@
 #!/usr/bin/env bash
-#
-# Copyright (C) 2025 zxcvos
-#
-# Xray-script:
-#   https://github.com/zxcvos/Xray-script
-#
-# docker-install:
-#   https://github.com/docker/docker-install
-#
-# Cloudflare WARP:
-#   https://github.com/haoel/haoel.github.io?tab=readme-ov-file#1043-docker-%E4%BB%A3%E7%90%86
-#   https://github.com/e7h4n/cloudflare-warp
-#
-# Cloudreve:
-#   https://cloudreve.org
+# =============================================================================
+# 脚本名称: docker.sh
+# 功能描述: 提供 Docker 环境管理功能，包括安装 Docker、管理 Cloudflare WARP 容器、
+#           以及管理 Cloudreve (v3 和 v4) 容器服务。
+#           支持多语言提示信息。
+# 时间: 2025-07-25
+# 版本: 1.0.0
+# 依赖: bash, jq, wget, sed, awk, grep, curl, openssl, docker, docker-compose
+# 配置:
+#   - ${SCRIPT_CONFIG_DIR}/config.json: 用于读取语言设置 (language) 和 URL 配置
+#   - ${I18N_DIR}/${lang}.json: 用于读取具体的提示文本 (i18n 数据文件)
+#   - ${CONFIG_DIR}/cloudflare-warp/Dockerfile: WARP 容器的构建文件
+#   - ${CLOUDREVE_V*_YAML_DIR}/docker-compose.yaml: Cloudreve 服务的编排文件
 # =============================================================================
 # 注释: 通过 Qwen3-Coder 生成。
 # 脚本名称: docker.sh
@@ -218,8 +216,10 @@ function install_docker() {
     # 打印开始安装的信息
     print_info "$(echo "$I18N_DATA" | jq -r '.docker.install.start')"
 
+    # 从配置文件读取 Docker 安装脚本 URL
+    local docker_install_url="$(jq -r '.urls.docker_install' "${SCRIPT_CONFIG_PATH}")"
     # 下载 Docker 官方安装脚本到工具目录
-    wget -O "${TOOL_DIR}/install-docker.sh" https://get.docker.com
+    wget -O "${TOOL_DIR}/install-docker.sh" "${docker_install_url}"
 
     # 检查是否为 CentOS 8 系统
     if [[ "$(_os)" == "centos" && "$(_os_ver)" -eq 8 ]]; then

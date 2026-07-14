@@ -1,7 +1,22 @@
 {
-  "version": "v2026.03.17",
+  "version": "v2026.07.14",
   "path": "",
   "language": "",
+  "urls": {
+    "xray_api_releases": "https://api.github.com/repos/XTLS/Xray-core/releases",
+    "xray_api_latest": "https://api.github.com/repos/XTLS/Xray-core/releases/latest",
+    "xray_release_tag": "https://github.com/XTLS/Xray-core/releases/tag/v{version}",
+    "xray_install": "https://github.com/XTLS/Xray-install/raw/main/install-release.sh",
+    "nginx_tags": "https://api.github.com/repos/nginx/nginx/tags",
+    "nginx_source": "https://nginx.org/download/{version}.tar.gz",
+    "openssl_tags": "https://api.github.com/repos/openssl/openssl/tags",
+    "openssl_source": "https://github.com/openssl/openssl/archive/{version}.tar.gz",
+    "ngx_brotli": "https://github.com/google/ngx_brotli",
+    "geodata_geoip": "https://github.com/Loyalsoldier/v2ray-rules-dat/raw/release/geoip.dat",
+    "geodata_geosite": "https://github.com/Loyalsoldier/v2ray-rules-dat/raw/release/geosite.dat",
+    "docker_install": "https://get.docker.com",
+    "acme_sh": "https://get.acme.sh"
+  },
   "xray": {
     "version": "",
     "warp": 0,
@@ -30,6 +45,10 @@
     ]
   },
   "nginx": {
+    "mode": "compile",
+    "binary": "",
+    "conf_dir": "",
+    "service_name": "",
     "version": "",
     "ca": "",
     "ca_server": "zerossl",

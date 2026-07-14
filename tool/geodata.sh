@@ -2,19 +2,17 @@
 
 set -e
 
-# 注释: 通过 Qwen3-Coder 生成。
 # 脚本名称: geodata.sh
-# 脚本仓库: https://github.com/zxcvos/Xray-script
-# 作者: zxcvos, LinFly, GitHub Copilot
-# 依赖: bash, curl, wget
+# 功能描述: 从配置文件指定的 URL 下载 GeoIP/GeoSite 数据并更新 Xray。
+# 依赖: bash, curl, jq
 
-# 获取当前脚本的目录和项目根目录的绝对路径
-readonly CUR_DIR="$(cd -P -- "$(dirname -- "$0")" && pwd -P)" # 当前脚本所在目录
-readonly PROJECT_ROOT="$(cd -P -- "${CUR_DIR}/.." && pwd -P)" # 项目根目录
+readonly CUR_DIR="$(cd -P -- "$(dirname -- "$0")" && pwd -P)"
+readonly PROJECT_ROOT="$(cd -P -- "${CUR_DIR}/.." && pwd -P)"
 readonly XRAY_DIR="${PROJECT_ROOT}/.xray-script/geodata"
+readonly SCRIPT_CONFIG_PATH="${PROJECT_ROOT}/.xray-script/config.json"
 
-GEOIP_URL="https://github.com/Loyalsoldier/v2ray-rules-dat/raw/release/geoip.dat"
-GEOSITE_URL="https://github.com/Loyalsoldier/v2ray-rules-dat/raw/release/geosite.dat"
+GEOIP_URL="$(jq -r '.urls.geodata_geoip' "${SCRIPT_CONFIG_PATH}")"
+GEOSITE_URL="$(jq -r '.urls.geodata_geosite' "${SCRIPT_CONFIG_PATH}")"
 
 [ -d "$XRAY_DIR" ] || mkdir -p "$XRAY_DIR"
 cd "$XRAY_DIR"

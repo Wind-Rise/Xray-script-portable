@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-#
-# Copyright (C) 2025 zxcvos
-#
-# Xray-script:
-#   https://github.com/zxcvos/Xray-script
+# =============================================================================
+# 脚本名称：generate.sh
+# 功能描述：生成器脚本，用于生成 UUID、密码、密钥等随机配置数据。
+#           支持多种生成模式 (uuid, password, seed, x25519, target, short-ids)。
+# 时间：2025-07-25
+# 版本：1.0.0
 # =============================================================================
 # 注释: 通过 Qwen3-Coder 生成。
 # 脚本名称: generate.sh

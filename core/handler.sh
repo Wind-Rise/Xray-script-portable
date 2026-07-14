@@ -1,9 +1,22 @@
 #!/usr/bin/env bash
-#
-# Copyright (C) 2025 zxcvos
-#
-# Xray-script:
-#   https://github.com/zxcvos/Xray-script
+# =============================================================================
+# 脚本名称：handler.sh
+# 功能描述：Xray-script 项目的处理器脚本。
+#           负责执行具体的操作，如安装/卸载 Xray/Nginx、配置文件生成、
+#           启动/停止服务、管理 Docker 容器、处理路由规则等。
+#           支持 nginx/openresty/system 三种模式。
+#           由 main.sh 调用，根据传入参数执行相应功能。
+# 时间：2025-07-25
+# 版本：1.0.0
+# 依赖：bash, jq, curl, systemctl, crontab, sed, awk, grep, cut, tr
+# 配置:
+#   - ${SCRIPT_CONFIG_DIR}/config.json: 读取和写入脚本配置 (如版本、域名、密钥等)
+#   - ${I18N_DIR}/${lang}.json: 用于读取具体的提示文本 (i18n 数据文件)
+#   - ${CONFIG_DIR}/xray/*.json: 读取 Xray 配置模板
+#   - ${CONFIG_DIR}/nginx/conf/*: 读取 Nginx 配置模板
+#   - ${SCRIPT_CONFIG_DIR}/xray/config.json: 读取和写入 Xray 最终配置文件
+#   - ${PROJECT_ROOT}/nginx/conf/*: 读取和写入 Nginx 最终配置文件
+#   - ${SCRIPT_CONFIG_DIR}/acme.sh/: 读取和写入 SSL 证书相关文件
 # =============================================================================
 # 注释: 通过 Qwen3-Coder 生成。
 # 脚本名称: handler.sh
@@ -1422,25 +1435,24 @@ function handler_custom_sites() {
 # 返回值: 无 (直接修改 CONFIG_DATA 和 SCRIPT_CONFIG 全局变量)
 # =============================================================================
 function handler_xray_version() {
-    local xray_version="$1" # 获取版本指定参数
-    # 根据版本指定参数确定具体版本
+    local xray_version="$1"
+    
+    # 从配置文件读取 Xray API URL
+    local xray_api_releases="$(jq -r '.urls.xray_api_releases' "${SCRIPT_CONFIG_PATH}")"
+    local xray_api_latest="$(jq -r '.urls.xray_api_latest' "${SCRIPT_CONFIG_PATH}")"
+    
     case "${xray_version,,}" in
     latest)
-        # 获取最新的 Xray 版本
-        CONFIG_DATA['version']="$(curl -fsSL https://api.github.com/repos/XTLS/Xray-core/releases | jq -r '.[0].tag_name')"
+        CONFIG_DATA['version']="$(curl -fsSL "${xray_api_releases}" | jq -r '.[0].tag_name')"
         ;;
     custom)
-        # 读取用户自定义的版本
         exec_read 'version'
         ;;
     *)
-        # 获取最新的 release 版本
-        CONFIG_DATA['version']="$(curl -fsSL https://api.github.com/repos/XTLS/Xray-core/releases/latest | jq -r '.tag_name')"
+        CONFIG_DATA['version']="$(curl -fsSL "${xray_api_latest}" | jq -r '.tag_name')"
         ;;
     esac
-    # 更新脚本配置中的 Xray 版本
     SCRIPT_CONFIG="$(echo "${SCRIPT_CONFIG}" | jq --arg xray "${CONFIG_DATA['version']}" '.xray.version = $xray')"
-    # 将更新后的脚本配置写入文件
     echo "${SCRIPT_CONFIG}" >"${SCRIPT_CONFIG_PATH}" && sleep 2
 }
 
@@ -1489,19 +1501,20 @@ function handler_change_xray_port() {
 # 返回值: 无 (通过调用外部脚本执行安装)
 # =============================================================================
 function handler_install() {
-    local xray_version="$1"       # 获取版本参数
-    local force_install="${2:-n}" # 获取强制安装参数，默认为 'n'
-    # 如果提供了版本参数，则处理版本配置
+    local xray_version="$1"
+    local force_install="${2:-n}"
+    
     if [[ -n "${xray_version}" ]]; then
         handler_xray_version "${xray_version}"
     else
-        # 否则从脚本配置中读取版本
         CONFIG_DATA['version']="$(echo "${SCRIPT_CONFIG}" | jq -r '.xray.version')"
     fi
-    # 检查 Xray 命令是否存在，或是否强制安装
+    
+    # 从配置文件读取 Xray-install URL
+    local xray_install_url="$(jq -r '.urls.xray_install' "${SCRIPT_CONFIG_PATH}")"
+    
     if ! cmd_exists 'xray' || [[ "${force_install}" != n ]]; then
-        # 调用 Xray-install 脚本进行安装
-        bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install -u root --version "${CONFIG_DATA['version']}"
+        bash -c "$(curl -L "${xray_install_url}")" @ install -u root --version "${CONFIG_DATA['version']}"
     fi
 }
 
@@ -1512,11 +1525,9 @@ function handler_install() {
 # 返回值: 无 (通过调用外部脚本执行卸载)
 # =============================================================================
 function handler_purge() {
-    # 调用 Xray-install 脚本进行卸载 (带 --purge 参数)
-    bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ remove --purge
-    # 重置 xray 字段
+    local xray_install_url="$(jq -r '.urls.xray_install' "${SCRIPT_CONFIG_PATH}")"
+    bash -c "$(curl -L "${xray_install_url}")" @ remove --purge
     SCRIPT_CONFIG=$(reset_json_fields "${SCRIPT_CONFIG}" 'xray')
-    # 将重置后的脚本配置写入文件
     echo "${SCRIPT_CONFIG}" >"${SCRIPT_CONFIG_PATH}" && sleep 2
 }
 
@@ -1733,22 +1744,35 @@ function handler_reset_warp() {
 # 返回值: 无 (通过调用其他脚本执行操作)
 # =============================================================================
 function handler_nginx_install() {
-    # 检查 nginx 命令是否存在
-    if ! cmd_exists 'nginx'; then
-        # 调用 nginx.sh 脚本安装 Nginx (带 Brotli 支持)
-        bash "${NGINX_PATH}" --install --brotli || _error "nginx install failed"
-        # 安装 SSL 证书管理工具
-        handler_ssl_install || _error "ssl install failed during nginx setup"
-        # 配置 Nginx
-        handler_nginx_config || _error "nginx config apply failed"
-        # 获取 Nginx 版本
+    local nginx_mode="$(jq -r '.nginx.mode // "compile"' "${SCRIPT_CONFIG_PATH}")"
+    
+    case "${nginx_mode}" in
+    openresty|system)
+        print_info "Detected mode: ${nginx_mode}. Checking for existing installation..."
+        if ! cmd_exists "nginx"; then
+            _error "Nginx/OpenResty not found in PATH. Please install ${nginx_mode} first."
+        fi
+        # 获取版本信息
         local NGINX_VERSION="$(nginx -V 2>&1 | grep "^nginx version:.*" | cut -d / -f 2)"
-        [[ -n "${NGINX_VERSION}" ]] || _error "failed to detect nginx version"
-        # 更新脚本配置中的 Nginx 版本
+        [[ -n "${NGINX_VERSION}" ]] || NGINX_VERSION="unknown"
         SCRIPT_CONFIG=$(echo "${SCRIPT_CONFIG}" | jq --arg version "${NGINX_VERSION}" '.nginx.version = $version')
-        # 将更新后的脚本配置写入文件
-        echo "${SCRIPT_CONFIG}" >"${SCRIPT_CONFIG_PATH}" && sleep 2 || _error "failed to persist nginx version"
-    fi
+        echo "${SCRIPT_CONFIG}" >"${SCRIPT_CONFIG_PATH}" && sleep 2
+        ;;
+    *)
+        # compile 模式：检查是否已安装
+        if ! cmd_exists 'nginx'; then
+            bash "${NGINX_PATH}" --install --brotli || _error "nginx install failed"
+            handler_ssl_install || _error "ssl install failed during nginx setup"
+            handler_nginx_config || _error "nginx config apply failed"
+            local NGINX_VERSION="$(nginx -V 2>&1 | grep "^nginx version:.*" | cut -d / -f 2)"
+            [[ -n "${NGINX_VERSION}" ]] || _error "failed to detect nginx version"
+            SCRIPT_CONFIG=$(echo "${SCRIPT_CONFIG}" | jq --arg version "${NGINX_VERSION}" '.nginx.version = $version')
+            echo "${SCRIPT_CONFIG}" >"${SCRIPT_CONFIG_PATH}" && sleep 2 || _error "failed to persist nginx version"
+        else
+            print_info "Nginx already installed, skipping installation"
+        fi
+        ;;
+    esac
 }
 
 # =============================================================================
@@ -1758,8 +1782,16 @@ function handler_nginx_install() {
 # 返回值: 无 (通过调用 nginx.sh 脚本执行更新)
 # =============================================================================
 function handler_nginx_update() {
-    # 调用 nginx.sh 脚本更新 Nginx (带 Brotli 支持)
-    bash "${NGINX_PATH}" --update --brotli
+    local nginx_mode="$(jq -r '.nginx.mode // "compile"' "${SCRIPT_CONFIG_PATH}")"
+    
+    case "${nginx_mode}" in
+    openresty|system)
+        print_info "Update not supported for ${nginx_mode} mode. Please update ${nginx_mode} through your system package manager."
+        ;;
+    *)
+        bash "${NGINX_PATH}" --update --brotli
+        ;;
+    esac
 }
 
 # =============================================================================

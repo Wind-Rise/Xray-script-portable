@@ -1,12 +1,10 @@
 #!/usr/bin/env bash
 # =============================================================================
-# 注释: 通过 Qwen3-Coder 生成。
 # 脚本名称: ssl.sh
-# 脚本仓库: https://github.com/zxcvos/Xray-script
 # 功能描述: 使用 acme.sh 管理 SSL 证书的脚本。
 #           支持安装/更新/卸载 acme.sh，签发/续期/停止续期证书，
 #           检查证书状态和信息，以及管理 Nginx 配置。
-# 作者: zxcvos, LinFly, GitHub Copilot
+#           支持 nginx/openresty/system 三种 nginx 模式。
 # 时间: 2025-07-25
 # 版本: 1.0.0
 # 依赖: bash, curl, wget, git, jq, sed, awk, grep, nginx, systemctl, acme.sh
@@ -15,13 +13,11 @@
 #   - ${NGINX_CONFIG_PATH}/: Nginx 配置文件目录
 #   - ${ACME_WEBROOT_PATH}/: 用于 HTTP-01 挑战的临时 webroot 目录
 #   - ${SSL_CERT_PATH}/: 存放签发证书的目录
-#   - ${SCRIPT_CONFIG_DIR}/config.json: 用于读取语言设置 (language)
+#   - ${SCRIPT_CONFIG_DIR}/config.json: 用于读取语言设置 (language) 和 URL 配置
 #   - ${I18N_DIR}/${lang}.json: 用于读取具体的提示文本 (i18n 数据文件)
 # 相关链接:
 #   - acme.sh 官方仓库: https://github.com/acmesh-official/acme.sh
 #   - ZeroSSL CA: https://zerossl.com/
-#
-# Copyright (C) 2025 zxcvos
 # =============================================================================
 
 # set -Eeuxo pipefail
@@ -52,6 +48,58 @@ readonly ACME_PATH="${ACME_DIR}/acme.sh"                        # ACME.sh 脚本
 readonly NGINX_CONFIG_PATH="${PROJECT_ROOT}/nginx/conf"  # Nginx 配置目录
 readonly ACME_WEBROOT_PATH="${SCRIPT_CONFIG_DIR}/acme-webroot"      # ACME HTTP 验证 webroot 目录
 readonly SSL_CERT_PATH="${SCRIPT_CONFIG_DIR}/certs" # SSL 证书存储目录
+
+# =============================================================================
+# 函数名称: get_nginx_bin
+# 功能描述: 获取 nginx/openresty 可执行文件路径。
+#           根据 config.json 中的 nginx.mode 和 nginx.binary 字段决定。
+# 返回值: nginx 可执行文件的绝对路径
+# =============================================================================
+function get_nginx_bin() {
+    local nginx_mode="$(jq -r '.nginx.mode // "compile"' "${SCRIPT_CONFIG_PATH}")"
+    local nginx_binary="$(jq -r '.nginx.binary // ""' "${SCRIPT_CONFIG_PATH}")"
+    
+    case "${nginx_mode}" in
+    openresty|system)
+        # 使用配置文件中指定的二进制路径
+        if [[ -n "${nginx_binary}" && -x "${nginx_binary}" ]]; then
+            echo "${nginx_binary}"
+        else
+            # 尝试从 PATH 中查找
+            command -v nginx 2>/dev/null || command -v openresty 2>/dev/null || echo "nginx"
+        fi
+        ;;
+    *)
+        # compile 模式：使用项目内的 nginx
+        echo "${PROJECT_ROOT}/nginx/bin/nginx"
+        ;;
+    esac
+}
+
+# =============================================================================
+# 函数名称: get_nginx_service_name
+# 功能描述: 获取 nginx 服务名称 (用于 systemctl)。
+# 返回值: 服务名称
+# =============================================================================
+function get_nginx_service_name() {
+    local nginx_mode="$(jq -r '.nginx.mode // "compile"' "${SCRIPT_CONFIG_PATH}")"
+    local service_name="$(jq -r '.nginx.service_name // ""' "${SCRIPT_CONFIG_PATH}")"
+    
+    case "${nginx_mode}" in
+    openresty|system)
+        # 使用配置文件中指定的服务名称
+        if [[ -n "${service_name}" ]]; then
+            echo "${service_name}"
+        else
+            # 默认使用 nginx
+            echo "nginx"
+        fi
+        ;;
+    *)
+        echo "nginx"
+        ;;
+    esac
+}
 
 # --- 全局变量声明 ---
 # 声明用于存储脚本操作、域名、邮箱、存储语言参数和国际化数据的全局变量
@@ -211,9 +259,11 @@ function install_acme_sh() {
     print_info "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.install.start")"
     resolve_ca_server
 
+    # 从配置文件读取 acme.sh 安装 URL
+    local acme_sh_url="$(jq -r '.urls.acme_sh' "${SCRIPT_CONFIG_PATH}")"
     # 使用 curl 下载并运行 acme.sh 安装脚本，设置账户邮箱并指定项目目录
     mkdir -p "${ACME_HOME}"
-    HOME="${ACME_HOME}" curl https://get.acme.sh | sh -s email="${ACCOUNT_EMAIL}" || print_error "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.install.fail_download")"
+    HOME="${ACME_HOME}" curl "${acme_sh_url}" | sh -s email="${ACCOUNT_EMAIL}" || print_error "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.install.fail_download")"
 
     # 启用 acme.sh 的自动升级功能
     "${ACME_PATH}" --upgrade --auto-upgrade || print_error "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.install.fail_autoupgrade")"
@@ -314,14 +364,15 @@ http {
 }
 EOF
 
-    local nginx_bin="${PROJECT_ROOT}/nginx/bin/nginx"
+    local nginx_bin="$(get_nginx_bin)"
+    local nginx_service="$(get_nginx_service_name)"
     # 检查 Nginx 是否正在运行
-    if systemctl is-active --quiet nginx; then
+    if systemctl is-active --quiet "${nginx_service}"; then
         # 如果运行，则测试配置并重载
-        "${nginx_bin}" -t && systemctl reload nginx || print_error "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.issue.fail_reload_nginx")"
+        "${nginx_bin}" -t && systemctl reload "${nginx_service}" || print_error "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.issue.fail_reload_nginx")"
     else
         # 如果未运行，则测试配置并启动
-        "${nginx_bin}" -t && systemctl start nginx || print_error "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.issue.fail_start_nginx")"
+        "${nginx_bin}" -t && systemctl start "${nginx_service}" || print_error "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.issue.fail_start_nginx")"
     fi
 
     local issue_output=''
@@ -401,10 +452,12 @@ EOF
     mv -f "${nginx_conf_bak}" "${nginx_conf}"
 
     # 安装签发的证书到指定路径，并设置 Nginx 重载命令
+    local nginx_bin="$(get_nginx_bin)"
+    local nginx_service="$(get_nginx_service_name)"
     "${ACME_PATH}" --install-cert --ecc -d ${DOMAIN} \
         --key-file "${cert_path}/privkey.pem" \
         --fullchain-file "${cert_path}/fullchain.pem" \
-        --reloadcmd "${PROJECT_ROOT}/nginx/bin/nginx -t && systemctl reload nginx" || print_error "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.issue.fail_install_cert")"
+        --reloadcmd "${nginx_bin} -t && systemctl reload ${nginx_service}" || print_error "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.issue.fail_install_cert")"
 }
 
 # =============================================================================
