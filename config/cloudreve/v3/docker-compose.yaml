@@ -1,6 +1,6 @@
 services:
   cloudreve:
-    container_name: cloudreve
+    container_name: xsp-cloudreve-v3
     image: cloudreve/cloudreve:3.8.3
     restart: unless-stopped
     networks:
@@ -16,7 +16,7 @@ services:
     depends_on:
       - aria2
   aria2:
-    container_name: aria2
+    container_name: xsp-aria2
     image: p3terx/aria2-pro
     restart: unless-stopped
     networks:
@@ -29,11 +29,11 @@ services:
       - temp_data:/data
   watchtower:
     image: containrrr/watchtower
-    container_name: watchtower
+    container_name: xsp-watchtower
     restart: always
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-    command: aria2 watchtower --cleanup --schedule "0 30 6 * * *"
+    command: xsp-aria2 xsp-watchtower --cleanup --schedule "0 30 6 * * *"
     networks:
       - share_net
 volumes:

@@ -9,6 +9,7 @@ set -e
 readonly CUR_DIR="$(cd -P -- "$(dirname -- "$0")" && pwd -P)"
 readonly PROJECT_ROOT="$(cd -P -- "${CUR_DIR}/.." && pwd -P)"
 readonly XRAY_DIR="${PROJECT_ROOT}/.xray-script/geodata"
+readonly XRAY_BIN="${PROJECT_ROOT}/.xray-script/bin/xray"
 readonly SCRIPT_CONFIG_PATH="${PROJECT_ROOT}/.xray-script/config.json"
 
 GEOIP_URL="$(jq -r '.urls.geodata_geoip' "${SCRIPT_CONFIG_PATH}")"
@@ -34,4 +35,4 @@ rm -f geoip.dat geosite.dat
 mv geoip.dat.new geoip.dat
 mv geosite.dat.new geosite.dat
 
-systemctl -q is-active xray && systemctl restart xray
+systemctl -q is-active xsp-xray 2>/dev/null && systemctl restart xsp-xray 2>/dev/null || true

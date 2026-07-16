@@ -7,6 +7,7 @@
     "xray_api_latest": "https://api.github.com/repos/XTLS/Xray-core/releases/latest",
     "xray_release_tag": "https://github.com/XTLS/Xray-core/releases/tag/v{version}",
     "xray_install": "https://github.com/XTLS/Xray-install/raw/main/install-release.sh",
+    "xray_binary": "https://github.com/XTLS/Xray-core/releases/download/v{version}/Xray-linux-{arch}.zip",
     "nginx_tags": "https://api.github.com/repos/nginx/nginx/tags",
     "nginx_source": "https://nginx.org/download/{version}.tar.gz",
     "openssl_tags": "https://api.github.com/repos/openssl/openssl/tags",

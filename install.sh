@@ -276,6 +276,9 @@ function main() {
 
     load_i18n
 
+    # 清理旧版遗留服务（xray/nginx systemd 服务、Docker 容器、Cron 条目）
+    bash "${PROJECT_ROOT}/core/handler.sh" '--cleanup-legacy' >/dev/null 2>&1 || true
+
     [[ $EUID -ne 0 ]] && _error "${I18N_DATA['root']}"
 
     check_os

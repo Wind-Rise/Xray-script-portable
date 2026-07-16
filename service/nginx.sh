@@ -58,7 +58,7 @@ readonly TMPFILE_DIR="$(mktemp -d -p "${PROJECT_ROOT}" -t nginxtemp.XXXXXXXX 2>/
 # 定义 Nginx 和其日志的安装/存储路径
 readonly NGINX_PATH="${PROJECT_ROOT}/nginx"   # Nginx 安装主目录
 readonly NGINX_LOG_PATH="${PROJECT_ROOT}/nginx/logs" # Nginx 日志目录
-readonly SYSTEMD_SERVICE_PATH="/etc/systemd/system/nginx.service" # Nginx systemd 服务文件路径（仅在 --service 时创建）
+readonly SYSTEMD_SERVICE_PATH="/etc/systemd/system/xsp-nginx.service" # XSP Nginx systemd 服务文件路径（仅在 --service 时创建）
 
 # --- 全局变量声明 ---
 declare IS_ENABLE_BROTLI="" # 存储用户是否选择启用 Brotli ('Y' 或 '')
@@ -496,7 +496,7 @@ function source_update() {
         cp objs/*.so "${NGINX_PATH}/modules/"
         ln -sf "${NGINX_PATH}/sbin/nginx" "${PROJECT_ROOT}/nginx/bin/nginx"
 
-        if systemctl is-active --quiet nginx; then
+        if systemctl is-active --quiet xsp-nginx; then
             print_info "$(echo "$I18N_DATA" | jq -r '.nginx.update.smooth_upgrade')"
             kill -USR2 $(cat "${PROJECT_ROOT}/nginx/run/nginx.pid")
             if [[ -e "${PROJECT_ROOT}/nginx/run/nginx.pid.oldbin" ]]; then
@@ -520,7 +520,7 @@ function purge_nginx() {
     print_info "$(echo "$I18N_DATA" | jq -r '.nginx.purge.start_purge')"
     if [[ -f "${SYSTEMD_SERVICE_PATH}" ]]; then
         if command -v systemctl >/dev/null 2>&1; then
-            systemctl stop nginx || true
+            systemctl stop xsp-nginx || true
         fi
         rm -rf "${SYSTEMD_SERVICE_PATH}"
         if command -v systemctl >/dev/null 2>&1; then
@@ -541,9 +541,9 @@ function purge_nginx() {
 # =============================================================================
 function systemctl_config_nginx() {
     print_info "$(echo "$I18N_DATA" | jq -r '.nginx.service.configure')"
-    cat >/etc/systemd/system/nginx.service <<EOF
+    cat >/etc/systemd/system/xsp-nginx.service <<EOF
 [Unit]
-Description=The NGINX HTTP and reverse proxy server
+Description=XSP - The NGINX HTTP and reverse proxy server
 After=syslog.target network-online.target remote-fs.target nss-lookup.target
 Wants=network-online.target
 

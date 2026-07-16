@@ -260,12 +260,12 @@ function get_container_ip() {
 # 返回值: 无 (执行构建过程，失败时会调用 print_error 退出)
 # =============================================================================
 function build_warp() {
-    # 检查名为 xray-script-warp 的镜像是否已存在
-    if ! docker images --format "{{.Repository}}" | grep -q xray-script-warp; then
+    # 检查名为 xsp-warp 的镜像是否已存在
+    if ! docker images --format "{{.Repository}}" | grep -q xsp-warp; then
         # 打印开始构建的信息
         print_info "$(echo "$I18N_DATA" | jq -r '.docker.warp.build.start')"
         # 使用 docker build 命令构建镜像，失败则调用 print_error 退出
-        docker build -t xray-script-warp "${CONFIG_DIR}/cloudflare-warp" || print_error "$(echo "$I18N_DATA" | jq -r '.docker.warp.build.fail')"
+        docker build -t xsp-warp "${CONFIG_DIR}/cloudflare-warp" || print_error "$(echo "$I18N_DATA" | jq -r '.docker.warp.build.fail')"
     fi
 }
 
@@ -277,16 +277,16 @@ function build_warp() {
 # 返回值: 容器的 IP 地址 (echo 输出)，或无输出
 # =============================================================================
 function enable_warp() {
-    # 检查名为 xray-script-warp 的容器是否已在运行
-    if ! docker ps --format "{{.Names}}" | grep -q "^xray-script-warp\$"; then
+    # 检查名为 xsp-warp 的容器是否已在运行
+    if ! docker ps --format "{{.Names}}" | grep -q "^xsp-warp\$"; then
         # 打印开始启用的信息
         print_info "$(echo "$I18N_DATA" | jq -r '.docker.warp.enable.start')"
         # 创建 Cloudflare WARP 容器所需的目录
         mkdir -vp "${WARP_DIR}" >&2
         # 使用 docker run 命令启动容器，失败则调用 print_error 退出
-        docker run -d --restart=always --name=xray-script-warp --log-driver json-file --log-opt max-size=100m --log-opt max-file=3 -v "${WARP_DIR}":/var/lib/cloudflare-warp:rw xray-script-warp >&2 || print_error "$(echo "$I18N_DATA" | jq -r '.docker.warp.build.fail')"
+        docker run -d --restart=always --name=xsp-warp --log-driver json-file --log-opt max-size=100m --log-opt max-file=3 -v "${WARP_DIR}":/var/lib/cloudflare-warp:rw xsp-warp >&2 || print_error "$(echo "$I18N_DATA" | jq -r '.docker.warp.build.fail')"
         # 获取新启动容器的 IP 地址
-        local container_ip=$(get_container_ip xray-script-warp)
+        local container_ip=$(get_container_ip xsp-warp)
         # 打印启用成功的消息，并包含容器 IP
         print_info "$(echo "$I18N_DATA" | jq -r ".docker.warp.enable.success" | sed "s/\${container_ip}/${container_ip}/")"
         # 输出容器 IP 地址
@@ -301,16 +301,16 @@ function enable_warp() {
 # 返回值: 无 (执行停止和清理过程)
 # =============================================================================
 function disable_warp() {
-    # 检查名为 xray-script-warp 的容器是否在运行
-    if docker ps --format "{{.Names}}" | grep -q "^xray-script-warp\$"; then
+    # 检查名为 xsp-warp 的容器是否在运行
+    if docker ps --format "{{.Names}}" | grep -q "^xsp-warp\$"; then
         # 打印停止容器的警告信息
         print_warn "$(echo "$I18N_DATA" | jq -r '.docker.warp.disable.stop')"
         # 停止容器
-        docker stop xray-script-warp
+        docker stop xsp-warp
         # 删除容器
-        docker rm xray-script-warp
+        docker rm xsp-warp
         # 删除镜像
-        docker image rm xray-script-warp
+        docker image rm xsp-warp
         # 删除 WARP 数据目录
         rm -rf "${WARP_DIR}"
         # 打印禁用成功的消息
@@ -327,8 +327,8 @@ function disable_warp() {
 # 返回值: 无 (执行安装和启动过程)
 # =============================================================================
 function install_cloudreve_v3() {
-    # 检查名为 cloudreve_v3 的容器是否已在运行
-    if ! docker ps --format "{{.Names}}" | grep -q "^cloudreve_v3\$"; then
+    # 检查名为 xsp-cloudreve-v3 的容器是否已在运行
+    if ! docker ps --format "{{.Names}}" | grep -q "^xsp-cloudreve-v3\$"; then
         # 打印创建目录的信息
         print_info "$(echo "$I18N_DATA" | jq -r '.docker.cloudreve_v3.create_dir')"
         # 创建 Cloudreve v3 所需的目录结构和文件
@@ -343,9 +343,9 @@ function install_cloudreve_v3() {
         # 将配置文件目录中的 docker-compose.yaml 复制到实际工作目录
         cp "${CLOUDREVE_V3_YAML_DIR}/docker-compose.yaml" "${CLOUDREVE_V3_DIR}/docker-compose.yaml"
         # 修改 docker-compose.yaml 中的服务名称
-        sed -i "s|cloudreve:$|cloudreve_v3:|" "${CLOUDREVE_V3_DIR}/docker-compose.yaml"
+        sed -i "s|cloudreve:$|xsp-cloudreve-v3:|" "${CLOUDREVE_V3_DIR}/docker-compose.yaml"
         # 修改 docker-compose.yaml 中的容器名称
-        sed -i "s|container_name: cloudreve|container_name: cloudreve_v3|" "${CLOUDREVE_V3_DIR}/docker-compose.yaml"
+        sed -i "s|container_name: cloudreve|container_name: xsp-cloudreve-v3|" "${CLOUDREVE_V3_DIR}/docker-compose.yaml"
         # 修改 docker-compose.yaml 中的挂载路径
         sed -i "s|/usr/local/cloudreve|${CLOUDREVE_V3_DIR}|" "${CLOUDREVE_V3_DIR}/docker-compose.yaml"
         # 生成并替换 Aria2 的 RPC 密钥
@@ -372,10 +372,10 @@ function install_cloudreve_v3() {
 # 返回值: 无 (打印管理员账户信息到 >&2)
 # =============================================================================
 function get_cloudreve_v3_admin() {
-    # 检查名为 cloudreve_v3 的容器是否在运行
-    if docker ps --format "{{.Names}}" | grep -q "^cloudreve_v3\$"; then
+    # 检查名为 xsp-cloudreve-v3 的容器是否在运行
+    if docker ps --format "{{.Names}}" | grep -q "^xsp-cloudreve-v3\$"; then
         # 获取容器启动日志的前 20 行
-        local cloudreve_info="$(docker logs cloudreve_v3 | head -n 20)"
+        local cloudreve_info="$(docker logs xsp-cloudreve-v3 | head -n 20)"
         # 从日志中提取用户名 (通常是第一行包含 Admin 的最后一列)
         local cloudreve_username="$(echo "${cloudreve_info}" | grep Admin | awk '{print $NF}' | head -1)"
         # 从日志中提取密码 (通常是第二行包含 Admin 的最后一列)
@@ -407,7 +407,7 @@ function get_aria2_token() {
 # =============================================================================
 function reset_cloudreve_v3_admin() {
     # 检查名为 cloudreve_v3 的容器是否在运行
-    if docker ps --format "{{.Names}}" | grep -q "^cloudreve_v3\$"; then
+    if docker ps --format "{{.Names}}" | grep -q "^xsp-cloudreve-v3\$"; then
         # 打印重置账户的信息
         print_info "$(echo "$I18N_DATA" | jq -r '.docker.cloudreve_v3.reset')"
         # 切换到 Cloudreve v3 目录
@@ -434,8 +434,8 @@ function reset_cloudreve_v3_admin() {
 # 返回值: 无 (执行卸载过程)
 # =============================================================================
 function purge_cloudreve_v3() {
-    # 检查名为 cloudreve_v3 的容器是否在运行
-    if docker ps --format "{{.Names}}" | grep -q "^cloudreve_v3\$"; then
+    # 检查名为 xsp-cloudreve-v3 的容器是否在运行
+    if docker ps --format "{{.Names}}" | grep -q "^xsp-cloudreve-v3\$"; then
         # 打印彻底卸载的警告信息
         print_warn "$(echo "$I18N_DATA" | jq -r '.docker.cloudreve_v3.purge')"
         # 切换到 Cloudreve v3 目录
@@ -457,8 +457,8 @@ function purge_cloudreve_v3() {
 # 返回值: 无 (执行启动过程)
 # =============================================================================
 function start_cloudreve_v3() {
-    # 检查名为 cloudreve_v3 的容器是否未在运行
-    if ! docker ps --format "{{.Names}}" | grep -q "^cloudreve_v3\$"; then
+    # 检查名为 xsp-cloudreve-v3 的容器是否未在运行
+    if ! docker ps --format "{{.Names}}" | grep -q "^xsp-cloudreve-v3\$"; then
         # 检查 Cloudreve v3 目录是否存在
         if [[ -d "${CLOUDREVE_V3_DIR}" ]]; then
             # 打印启动服务的信息
@@ -482,8 +482,8 @@ function start_cloudreve_v3() {
 # 返回值: 无 (执行停止过程)
 # =============================================================================
 function stop_cloudreve_v3() {
-    # 检查名为 cloudreve_v3 的容器是否在运行
-    if docker ps --format "{{.Names}}" | grep -q "^cloudreve_v3\$"; then
+    # 检查名为 xsp-cloudreve-v3 的容器是否在运行
+    if docker ps --format "{{.Names}}" | grep -q "^xsp-cloudreve-v3\$"; then
         # 打印停止服务的警告信息
         print_warn "$(echo "$I18N_DATA" | jq -r '.docker.cloudreve_v3.stop')"
         # 切换到 Cloudreve v3 目录
@@ -501,8 +501,8 @@ function stop_cloudreve_v3() {
 # 返回值: 无 (执行安装和启动过程)
 # =============================================================================
 function install_cloudreve_v4() {
-    # 检查名为 cloudreve_v4 的容器是否已在运行
-    if ! docker ps --format "{{.Names}}" | grep -q "^cloudreve_v4\$"; then
+    # 检查名为 xsp-cloudreve-v4 的容器是否已在运行
+    if ! docker ps --format "{{.Names}}" | grep -q "^xsp-cloudreve-v4\$"; then
         # 打印创建目录的信息
         print_info "$(echo "$I18N_DATA" | jq -r '.docker.cloudreve_v4.create_dir')"
         # 创建 Cloudreve v4 目录
@@ -510,9 +510,9 @@ function install_cloudreve_v4() {
         # 将配置文件目录中的 docker-compose.yaml 复制到实际工作目录
         cp "${CLOUDREVE_V4_YAML_DIR}/docker-compose.yaml" "${CLOUDREVE_V4_DIR}/docker-compose.yaml"
         # 修改 docker-compose.yaml 中的服务名称
-        sed -i "s|cloudreve:$|cloudreve_v4:|" "${CLOUDREVE_V4_DIR}/docker-compose.yaml"
+        sed -i "s|cloudreve:$|xsp-cloudreve-v4:|" "${CLOUDREVE_V4_DIR}/docker-compose.yaml"
         # 修改 docker-compose.yaml 中的容器名称
-        sed -i "s|container_name: cloudreve-backend|container_name: cloudreve_v4|" "${CLOUDREVE_V4_DIR}/docker-compose.yaml"
+        sed -i "s|container_name: cloudreve-backend|container_name: xsp-cloudreve-v4|" "${CLOUDREVE_V4_DIR}/docker-compose.yaml"
 
         # 打印启动服务的信息
         print_info "$(echo "$I18N_DATA" | jq -r '.docker.cloudreve_v4.start')"
@@ -530,8 +530,8 @@ function install_cloudreve_v4() {
 # 返回值: 无 (执行更新过程)
 # =============================================================================
 function update_cloudreve_v4() {
-    # 检查名为 cloudreve_v4 的容器是否在运行
-    if docker ps --format "{{.Names}}" | grep -q "^cloudreve_v4\$"; then
+    # 检查名为 xsp-cloudreve-v4 的容器是否在运行
+    if docker ps --format "{{.Names}}" | grep -q "^xsp-cloudreve-v4\$"; then
         # 打印更新服务的信息
         print_info "$(echo "$I18N_DATA" | jq -r '.docker.cloudreve_v4.update')"
         # 切换到 Cloudreve v4 目录
@@ -552,8 +552,8 @@ function update_cloudreve_v4() {
 # 返回值: 无 (执行卸载过程)
 # =============================================================================
 function purge_cloudreve_v4() {
-    # 检查名为 cloudreve_v4 的容器是否在运行
-    if docker ps --format "{{.Names}}" | grep -q "^cloudreve_v4\$"; then
+    # 检查名为 xsp-cloudreve-v4 的容器是否在运行
+    if docker ps --format "{{.Names}}" | grep -q "^xsp-cloudreve-v4\$"; then
         # 打印彻底卸载的警告信息
         print_warn "$(echo "$I18N_DATA" | jq -r '.docker.cloudreve_v4.purge')"
         # 切换到 Cloudreve v4 目录
@@ -575,8 +575,8 @@ function purge_cloudreve_v4() {
 # 返回值: 无 (执行启动过程)
 # =============================================================================
 function start_cloudreve_v4() {
-    # 检查名为 cloudreve_v4 的容器是否未在运行
-    if ! docker ps --format "{{.Names}}" | grep -q "^cloudreve_v4\$"; then
+    # 检查名为 xsp-cloudreve-v4 的容器是否未在运行
+    if ! docker ps --format "{{.Names}}" | grep -q "^xsp-cloudreve-v4\$"; then
         # 检查 Cloudreve v4 目录是否存在
         if [[ -d "${CLOUDREVE_V4_DIR}" ]]; then
             # 打印启动服务的信息
@@ -600,8 +600,8 @@ function start_cloudreve_v4() {
 # 返回值: 无 (执行停止过程)
 # =============================================================================
 function stop_cloudreve_v4() {
-    # 检查名为 cloudreve_v4 的容器是否在运行
-    if docker ps --format "{{.Names}}" | grep -q "^cloudreve_v4\$"; then
+    # 检查名为 xsp-cloudreve-v4 的容器是否在运行
+    if docker ps --format "{{.Names}}" | grep -q "^xsp-cloudreve-v4\$"; then
         # 打印停止服务的警告信息
         print_warn "$(echo "$I18N_DATA" | jq -r '.docker.cloudreve_v4.stop')"
         # 切换到 Cloudreve v4 目录
@@ -620,7 +620,7 @@ function stop_cloudreve_v4() {
 # =============================================================================
 function clean_container_logs() {
     # 获取容器名称或 ID
-    local container_name_or_id="${1:-xray-script-warp}"
+    local container_name_or_id="${1:-xsp-warp}"
     # 找到容器的日志文件并清空
     truncate -s 0 $(docker inspect --format='{{.LogPath}}' "${container_name_or_id}")
 }
@@ -634,7 +634,7 @@ function clean_container_logs() {
 # =============================================================================
 function obtain_container_ip() {
     # 获取容器名称
-    local container_name="${1:-xray-script-warp}"
+    local container_name="${1:-xsp-warp}"
 	# 获取容器的 IP 地址
 	local container_ip=$(get_container_ip "${container_name}")
     if [[ -n "${container_ip}" ]]; then
