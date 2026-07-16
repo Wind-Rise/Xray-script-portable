@@ -519,8 +519,8 @@ function show_config() {
 # 返回值: 无 (调用其他函数进行显示)
 # =============================================================================
 function show_fallback_config() {
-    # 设置第一个配置的标签为 'fallbak_vision_reality'
-    CLIENT_CONFIG[tag]='fallbak_vision_reality'
+    # 设置第一个配置的标签为 'fallback_vision_reality'
+    CLIENT_CONFIG[tag]='fallback_vision_reality'
     # 生成 Vision 分享链接
     get_vision_share_link
     # 显示第一个配置
@@ -528,8 +528,8 @@ function show_fallback_config() {
 
     # 重新获取第二个 inbound (index 2) 的通用配置
     get_common_config 2
-    # 设置第二个配置的标签为 'fallbak_xhttp_reality'
-    CLIENT_CONFIG[tag]='fallbak_xhttp_reality'
+    # 设置第二个配置的标签为 'fallback_xhttp_reality'
+    CLIENT_CONFIG[tag]='fallback_xhttp_reality'
     # 生成 fallback 的 XHTTP 分享链接
     get_fallback_xhttp_share_link
 }

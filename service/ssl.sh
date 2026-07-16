@@ -262,8 +262,8 @@ function install_acme_sh() {
     # 从配置文件读取 acme.sh 安装 URL
     local acme_sh_url="$(jq -r '.urls.acme_sh' "${SCRIPT_CONFIG_PATH}")"
     # 使用 curl 下载并运行 acme.sh 安装脚本，设置账户邮箱并指定项目目录
-    mkdir -p "${ACME_HOME}"
-    HOME="${ACME_HOME}" curl "${acme_sh_url}" | sh -s email="${ACCOUNT_EMAIL}" || print_error "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.install.fail_download")"
+    mkdir -p "${ACME_DIR}"
+    HOME="${ACME_DIR}" curl "${acme_sh_url}" | sh -s email="${ACCOUNT_EMAIL}" || print_error "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.install.fail_download")"
 
     # 启用 acme.sh 的自动升级功能
     "${ACME_PATH}" --upgrade --auto-upgrade || print_error "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.install.fail_autoupgrade")"
@@ -304,7 +304,7 @@ function purge_acme_sh() {
     fi
 
     # 删除 acme.sh 相关目录和文件
-    rm -rf "${ACME_HOME}" "${ACME_WEBROOT_PATH}" "${NGINX_CONFIG_PATH}/certs"
+    rm -rf "${ACME_DIR}" "${ACME_WEBROOT_PATH}" "${NGINX_CONFIG_PATH}/certs"
     # 打印删除成功信息
     print_info "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.purge.success")"
 }
@@ -489,7 +489,7 @@ function stop_renew_certificates() {
         # 执行 acme.sh 的移除命令（停止续期）
         "${ACME_PATH}" --remove -d ${DOMAIN} --ecc || print_warn "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.stop_renew.fail_cmd")"
         # 删除该域名的 acme.sh 本地存储目录
-        rm -rf "${ACME_HOME}/${DOMAIN}_ecc" # 更健壮的路径处理
+        rm -rf "${ACME_DIR}/${DOMAIN}_ecc" # 更健壮的路径处理
         # 删除该域名的本地证书目录
         rm -rf "${NGINX_CONFIG_PATH}/certs/${DOMAIN}" # 更健壮的路径处理
     else
@@ -509,7 +509,7 @@ function check_cron_jobs() {
     print_info "$(echo "$I18N_DATA" | jq -r ".${CUR_FILE}.check_cron.start")"
 
     # 执行 acme.sh 的 cron 检查命令
-    "${ACME_PATH}" --cron --home "${ACME_HOME}"
+    "${ACME_PATH}" --cron --home "${ACME_DIR}"
 }
 
 # =============================================================================
@@ -526,7 +526,7 @@ function check_certificate_status() {
 
     # 从 acme.sh 列表中查找匹配的域名
     local main_domain=$(
-        "${ACME_PATH}" --list --home "${ACME_HOME}" |
+        "${ACME_PATH}" --list --home "${ACME_DIR}" |
             grep -E "^${DOMAIN}" |
             awk '{print $1}'
     )

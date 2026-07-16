@@ -735,7 +735,7 @@ function handler_routing() {
     # 调用 exec_read 读取用户输入的规则值
     exec_read "${rule_tag}"
     # 调用 add_rule 将规则添加到 Xray 配置中
-    add_rule "${rule_tag}" "${rule_target}" "${XRAY_CONFIG[${rule_tag}]}" "${rule_type}"
+    add_rule "${rule_tag}" "${rule_target}" "${CONFIG_DATA[${rule_tag}]}" "${rule_type}"
 }
 
 # =============================================================================
@@ -1748,7 +1748,7 @@ function handler_nginx_install() {
     
     case "${nginx_mode}" in
     openresty|system)
-        print_info "Detected mode: ${nginx_mode}. Checking for existing installation..."
+        echo -e "${GREEN}[$(echo "$I18N_DATA" | jq -r '.title.info')]${NC} Detected mode: ${nginx_mode}. Checking for existing installation..." >&2
         if ! cmd_exists "nginx"; then
             _error "Nginx/OpenResty not found in PATH. Please install ${nginx_mode} first."
         fi
@@ -1769,7 +1769,7 @@ function handler_nginx_install() {
             SCRIPT_CONFIG=$(echo "${SCRIPT_CONFIG}" | jq --arg version "${NGINX_VERSION}" '.nginx.version = $version')
             echo "${SCRIPT_CONFIG}" >"${SCRIPT_CONFIG_PATH}" && sleep 2 || _error "failed to persist nginx version"
         else
-            print_info "Nginx already installed, skipping installation"
+            echo -e "${GREEN}[$(echo "$I18N_DATA" | jq -r '.title.info')]${NC} Nginx already installed, skipping installation" >&2
         fi
         ;;
     esac
@@ -1786,7 +1786,7 @@ function handler_nginx_update() {
     
     case "${nginx_mode}" in
     openresty|system)
-        print_info "Update not supported for ${nginx_mode} mode. Please update ${nginx_mode} through your system package manager."
+        echo -e "${GREEN}[$(echo "$I18N_DATA" | jq -r '.title.info')]${NC} Update not supported for ${nginx_mode} mode. Please update ${nginx_mode} through your system package manager." >&2
         ;;
     *)
         bash "${NGINX_PATH}" --update --brotli

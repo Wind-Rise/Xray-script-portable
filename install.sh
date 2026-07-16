@@ -51,7 +51,6 @@ declare -A I18N_DATA=(
     ['failed']='下载失败'
     ['downloaded']='文件已下载到'
 )
-declare PROJECT_ROOT=''
 declare I18N_DIR=''
 declare CORE_DIR=''
 declare SERVICE_DIR=''
@@ -110,6 +109,13 @@ function parse_args() {
             ;;
         --check-deps)
             FORCE_CHECK_DEPS=1
+            ;;
+        --vision | --xhttp | --fallback)
+            QUICK_INSTALL="${1}"
+            ;;
+        -d)
+            shift
+            PROJECT_ROOT_OVERRIDE="${1}"
             ;;
         esac
         shift
@@ -255,6 +261,12 @@ function main() {
     SCRIPT_CONFIG_DIR="${PROJECT_ROOT}/.xray-script"
     SCRIPT_CONFIG_PATH="${SCRIPT_CONFIG_DIR}/config.json"
 
+    # 在创建配置之前检查是否首次运行
+    local is_first_run=0
+    if [[ ! -f "${SCRIPT_CONFIG_PATH}" ]]; then
+        is_first_run=1
+    fi
+
     if [[ ! -d "${SCRIPT_CONFIG_DIR}" ]]; then
         mkdir -p "${SCRIPT_CONFIG_DIR}"
     fi
@@ -268,11 +280,6 @@ function main() {
 
     check_os
 
-    local is_first_run=0
-    if [[ ! -f "${SCRIPT_CONFIG_PATH}" ]]; then
-        is_first_run=1
-    fi
-
     if [[ "${is_first_run}" -eq 1 || "${FORCE_CHECK_DEPS}" -eq 1 ]]; then
         if ! check_dependencies; then
             install_dependencies
@@ -281,24 +288,6 @@ function main() {
             install_dependencies
         fi
     fi
-
-    if [[ ! -d "${SCRIPT_CONFIG_DIR}" ]]; then
-        mkdir -p "${SCRIPT_CONFIG_DIR}"
-    fi
-    init_local_config
-
-    while [[ $# -gt 0 ]]; do
-        case "$1" in
-        --vision | --xhttp | --fallback)
-            QUICK_INSTALL="${1}"
-            ;;
-        -d)
-            shift
-            PROJECT_ROOT_OVERRIDE="${1}"
-            ;;
-        esac
-        shift
-    done
 
     local script_path="$(jq -r '.path' "${SCRIPT_CONFIG_PATH}")"
     if [[ -z "${script_path}" && -z "${PROJECT_ROOT_OVERRIDE}" ]]; then
